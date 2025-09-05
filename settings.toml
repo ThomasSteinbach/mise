@@ -1255,6 +1255,37 @@ docs = """
   * `symlink`: Uses Windows NTFS SymbolicLink. Requires Windows Vista or later with admin privileges or enabling "Developer Mode" in Windows 10/11.
 """
 
+[url_replacements]
+env = "MISE_URL_REPLACEMENTS"
+type = "IndexMap<String, String>"
+optional = true
+parse_env = "parse_url_replacements"
+description = "Map of URL patterns to replacement URLs for download mirroring."
+docs = """
+Map of URL patterns to replacement URLs. This allows you to replace download URLs
+with custom mirrors or registries. The key is the original hostname/domain to replace,
+and the value is the replacement hostname/domain.
+
+Examples:
+- "github.com" -> "myregistry.net" replaces all GitHub URLs with your mirror
+- "releases.hashicorp.com" -> "mirror.example.com" replaces HashiCorp releases
+
+The replacement happens at the hostname level, preserving the path and query parameters.
+
+Configuration examples:
+
+Environment variable (JSON format):
+```bash
+export MISE_URL_REPLACEMENTS='{"github.com": "myregistry.net", "releases.hashicorp.com": "mirror.example.com"}'
+```
+
+In mise.toml:
+```toml
+[settings]
+url_replacements = { "github.com" = "myregistry.net", "releases.hashicorp.com" = "mirror.example.com" }
+```
+"""
+
 [yes]
 env = "MISE_YES"
 type = "Bool"

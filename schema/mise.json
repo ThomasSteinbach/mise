@@ -1021,6 +1021,13 @@
           "description": "Shim file mode for Windows. Options: `file`, `hardlink`, `symlink`.",
           "type": "string"
         },
+        "url_replacements": {
+          "description": "Map of URL patterns to replacement URLs for download mirroring.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "yes": {
           "description": "This will automatically answer yes or no to prompts. This is useful for scripting.",
           "type": "boolean"
