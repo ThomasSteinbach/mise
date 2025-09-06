@@ -436,20 +436,20 @@ mod tests {
     {
         // Lock to prevent parallel tests from interfering with global settings
         let _guard = TEST_SETTINGS_LOCK.lock().unwrap();
-        
+
         // Create settings with custom URL replacements
         let mut settings = crate::config::settings::SettingsPartial::empty();
         settings.url_replacements = Some(replacements);
-        
+
         // Set settings for this test
         crate::config::Settings::reset(Some(settings));
-        
+
         // Run test
         let result = test_fn();
-        
+
         // Clean up after test
         crate::config::Settings::reset(None);
-        
+
         result
     }
 
@@ -532,7 +532,10 @@ mod tests {
         with_test_settings(replacements, || {
             let mut url = Url::parse("https://github.com/owner/repo/releases").unwrap();
             apply_url_replacements(&mut url);
-            assert_eq!(url.as_str(), "https://my-proxy.com/mirror/owner/repo/releases");
+            assert_eq!(
+                url.as_str(),
+                "https://my-proxy.com/mirror/owner/repo/releases"
+            );
         });
     }
 
@@ -589,7 +592,9 @@ mod tests {
         );
 
         with_test_settings(replacements, || {
-            let mut url = Url::parse("https://github.com/owner/repo/releases/download/v1.0.0/file.tar.gz").unwrap();
+            let mut url =
+                Url::parse("https://github.com/owner/repo/releases/download/v1.0.0/file.tar.gz")
+                    .unwrap();
             apply_url_replacements(&mut url);
             assert_eq!(
                 url.as_str(),
@@ -616,7 +621,10 @@ mod tests {
     fn test_replacement_affects_full_url_not_just_hostname() {
         // Test that replacement works on the full URL string, not just hostname
         let mut replacements = IndexMap::new();
-        replacements.insert("github.com/owner".to_string(), "proxy.com/mirror".to_string());
+        replacements.insert(
+            "github.com/owner".to_string(),
+            "proxy.com/mirror".to_string(),
+        );
 
         with_test_settings(replacements, || {
             let mut url = Url::parse("https://github.com/owner/repo").unwrap();
@@ -633,10 +641,15 @@ mod tests {
         replacements.insert("/releases/download/".to_string(), "/artifacts/".to_string());
 
         with_test_settings(replacements, || {
-            let mut url = Url::parse("https://github.com/owner/repo/releases/download/v1.0.0/file.tar.gz").unwrap();
+            let mut url =
+                Url::parse("https://github.com/owner/repo/releases/download/v1.0.0/file.tar.gz")
+                    .unwrap();
             apply_url_replacements(&mut url);
             // Path component was replaced, proving it's full URL replacement
-            assert_eq!(url.as_str(), "https://github.com/owner/repo/artifacts/v1.0.0/file.tar.gz");
+            assert_eq!(
+                url.as_str(),
+                "https://github.com/owner/repo/artifacts/v1.0.0/file.tar.gz"
+            );
         });
     }
 
@@ -654,24 +667,37 @@ mod tests {
             assert_eq!(url.as_str(), "https://myregistry.net/user/repo");
         });
 
-        // Example 2: Protocol + hostname replacement  
+        // Example 2: Protocol + hostname replacement
         let mut replacements2 = IndexMap::new();
-        replacements2.insert("https://github.com".to_string(), "https://proxy.corp.com/github-mirror".to_string());
+        replacements2.insert(
+            "https://github.com".to_string(),
+            "https://proxy.corp.com/github-mirror".to_string(),
+        );
 
         with_test_settings(replacements2, || {
             let mut url = Url::parse("https://github.com/user/repo").unwrap();
             apply_url_replacements(&mut url);
-            assert_eq!(url.as_str(), "https://proxy.corp.com/github-mirror/user/repo");
+            assert_eq!(
+                url.as_str(),
+                "https://proxy.corp.com/github-mirror/user/repo"
+            );
         });
 
         // Example 3: Domain + path replacement
         let mut replacements3 = IndexMap::new();
-        replacements3.insert("github.com/releases/download/".to_string(), "cdn.example.com/artifacts/".to_string());
+        replacements3.insert(
+            "github.com/releases/download/".to_string(),
+            "cdn.example.com/artifacts/".to_string(),
+        );
 
         with_test_settings(replacements3, || {
-            let mut url = Url::parse("https://github.com/releases/download/v1.0.0/file.tar.gz").unwrap();
+            let mut url =
+                Url::parse("https://github.com/releases/download/v1.0.0/file.tar.gz").unwrap();
             apply_url_replacements(&mut url);
-            assert_eq!(url.as_str(), "https://cdn.example.com/artifacts/v1.0.0/file.tar.gz");
+            assert_eq!(
+                url.as_str(),
+                "https://cdn.example.com/artifacts/v1.0.0/file.tar.gz"
+            );
         });
     }
 }
