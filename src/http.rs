@@ -336,7 +336,11 @@ fn github_headers(url: &Url) -> HeaderMap {
 /// Apply URL replacements based on settings configuration
 /// Supports both simple string replacement and regex patterns (prefixed with "regex:")
 pub fn apply_url_replacements(url: &mut Url) {
-    let settings = Settings::get();
+    // Try to get settings, return early if not available (e.g., in some test scenarios)
+    let settings = match Settings::try_get() {
+        Ok(settings) => settings,
+        Err(_) => return,
+    };
     if let Some(replacements) = &settings.url_replacements {
         let url_string = url.to_string();
 
@@ -422,52 +426,47 @@ fn display_github_rate_limit(resp: &Response) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use confique::Partial;
     use indexmap::IndexMap;
     use url::Url;
 
-    // Helper function to test URL replacement with mock settings
-    fn test_url_replacement_with_settings(
-        replacements: IndexMap<String, String>,
-        original_url: &str,
-    ) -> String {
-        // We can't easily mock Settings in a unit test, so we test the logic directly
-        let mut url = Url::parse(original_url).unwrap();
-        let url_string = url.as_str();
-
-        for (pattern, replacement) in &replacements {
-            if let Some(pattern_without_prefix) = pattern.strip_prefix("regex:") {
-                // Regex replacement
-                if let Ok(regex) = regex::Regex::new(pattern_without_prefix) {
-                    if let Ok(new_url_string) =
-                        regex.replace(url_string, replacement.as_str()).parse()
-                    {
-                        url = new_url_string;
-                        break; // Apply only the first matching replacement
-                    }
-                }
-            } else {
-                // Simple string replacement
-                if url_string.contains(pattern) {
-                    let new_url_string = url_string.replace(pattern, replacement);
-                    if let Ok(new_url) = new_url_string.parse() {
-                        url = new_url;
-                        break; // Apply only the first matching replacement
-                    }
-                }
-            }
-        }
-
-        url.to_string()
+    // Helper to create test settings with specific URL replacements
+    fn with_test_settings<F, R>(replacements: IndexMap<String, String>, test_fn: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        // Save current settings state
+        let _guard = TEST_SETTINGS_LOCK.lock().unwrap();
+        
+        // Create settings with custom URL replacements
+        let mut settings = crate::config::settings::SettingsPartial::empty();
+        settings.url_replacements = Some(replacements);
+        
+        // Reset global settings with our test settings
+        crate::config::Settings::reset(Some(settings));
+        
+        // Run test
+        let result = test_fn();
+        
+        // Reset to clean state
+        crate::config::Settings::reset(None);
+        
+        result
     }
+
+    // Mutex to ensure tests don't interfere with each other
+    static TEST_SETTINGS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn test_simple_string_replacement() {
         let mut replacements = IndexMap::new();
         replacements.insert("github.com".to_string(), "my-proxy.com".to_string());
 
-        let result =
-            test_url_replacement_with_settings(replacements, "https://github.com/owner/repo");
-        assert_eq!(result, "https://my-proxy.com/owner/repo");
+        with_test_settings(replacements, || {
+            let mut url = Url::parse("https://github.com/owner/repo").unwrap();
+            apply_url_replacements(&mut url);
+            assert_eq!(url.as_str(), "https://my-proxy.com/owner/repo");
+        });
     }
 
     #[test]
@@ -478,12 +477,14 @@ mod tests {
             "https://my-proxy.com/artifactory/github-remote".to_string(),
         );
 
-        let result =
-            test_url_replacement_with_settings(replacements, "https://github.com/owner/repo");
-        assert_eq!(
-            result,
-            "https://my-proxy.com/artifactory/github-remote/owner/repo"
-        );
+        with_test_settings(replacements, || {
+            let mut url = Url::parse("https://github.com/owner/repo").unwrap();
+            apply_url_replacements(&mut url);
+            assert_eq!(
+                url.as_str(),
+                "https://my-proxy.com/artifactory/github-remote/owner/repo"
+            );
+        });
     }
 
     #[test]
@@ -494,17 +495,19 @@ mod tests {
             "https://secure-proxy.com".to_string(),
         );
 
-        // HTTPS gets replaced
-        let result1 = test_url_replacement_with_settings(
-            replacements.clone(),
-            "https://github.com/owner/repo",
-        );
-        assert_eq!(result1, "https://secure-proxy.com/owner/repo");
+        with_test_settings(replacements.clone(), || {
+            // HTTPS gets replaced
+            let mut url1 = Url::parse("https://github.com/owner/repo").unwrap();
+            apply_url_replacements(&mut url1);
+            assert_eq!(url1.as_str(), "https://secure-proxy.com/owner/repo");
+        });
 
-        // HTTP does not get replaced (no match)
-        let result2 =
-            test_url_replacement_with_settings(replacements, "http://github.com/owner/repo");
-        assert_eq!(result2, "http://github.com/owner/repo");
+        with_test_settings(replacements, || {
+            // HTTP does not get replaced (no match)
+            let mut url2 = Url::parse("http://github.com/owner/repo").unwrap();
+            apply_url_replacements(&mut url2);
+            assert_eq!(url2.as_str(), "http://github.com/owner/repo");
+        });
     }
 
     #[test]
@@ -515,34 +518,102 @@ mod tests {
             "https://my-proxy.com".to_string(),
         );
 
-        let result =
-            test_url_replacement_with_settings(replacements, "https://github.com/owner/repo");
-        assert_eq!(result, "https://my-proxy.com/owner/repo");
+        with_test_settings(replacements, || {
+            let mut url = Url::parse("https://github.com/owner/repo").unwrap();
+            apply_url_replacements(&mut url);
+            assert_eq!(url.as_str(), "https://my-proxy.com/owner/repo");
+        });
     }
 
     #[test]
     fn test_regex_with_capture_groups() {
         let mut replacements = IndexMap::new();
         replacements.insert(
+            r"regex:https://github\.com/([^/]+)/([^/]+)".to_string(),
+            "https://my-proxy.com/mirror/$1/$2".to_string(),
+        );
+
+        with_test_settings(replacements, || {
+            let mut url = Url::parse("https://github.com/owner/repo/releases").unwrap();
+            apply_url_replacements(&mut url);
+            assert_eq!(url.as_str(), "https://my-proxy.com/mirror/owner/repo/releases");
+        });
+    }
+
+    #[test]
+    fn test_regex_invalid_replacement_url() {
+        let mut replacements = IndexMap::new();
+        replacements.insert(
             r"regex:https://github\.com/([^/]+)".to_string(),
             "not-a-valid-url".to_string(),
         );
 
-        // Invalid result URL should be ignored, original URL unchanged
-        let result =
-            test_url_replacement_with_settings(replacements, "https://github.com/owner/repo");
-        assert_eq!(result, "https://github.com/owner/repo");
+        with_test_settings(replacements, || {
+            // Invalid result URL should be ignored, original URL unchanged
+            let mut url = Url::parse("https://github.com/owner/repo").unwrap();
+            let original = url.clone();
+            apply_url_replacements(&mut url);
+            assert_eq!(url.as_str(), original.as_str());
+        });
     }
 
     #[test]
-    fn test_real_apply_url_replacements_integration() {
-        // Test that the real apply_url_replacements function doesn't crash
+    fn test_multiple_replacements_first_match_wins() {
+        let mut replacements = IndexMap::new();
+        replacements.insert("github.com".to_string(), "first-proxy.com".to_string());
+        replacements.insert("github".to_string(), "second-proxy.com".to_string());
+
+        with_test_settings(replacements, || {
+            let mut url = Url::parse("https://github.com/owner/repo").unwrap();
+            apply_url_replacements(&mut url);
+            // First replacement should win
+            assert_eq!(url.as_str(), "https://first-proxy.com/owner/repo");
+        });
+    }
+
+    #[test]
+    fn test_no_replacements_configured() {
+        let replacements = IndexMap::new(); // Empty
+
+        with_test_settings(replacements, || {
+            let mut url = Url::parse("https://github.com/owner/repo").unwrap();
+            let original = url.clone();
+            apply_url_replacements(&mut url);
+            assert_eq!(url.as_str(), original.as_str());
+        });
+    }
+
+    #[test]
+    fn test_regex_complex_patterns() {
+        let mut replacements = IndexMap::new();
+        // Convert GitHub releases to JFrog Artifactory
+        replacements.insert(
+            r"regex:https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/(.+)".to_string(),
+            "https://artifactory.company.com/artifactory/github-releases/$1/$2/$3/$4".to_string(),
+        );
+
+        with_test_settings(replacements, || {
+            let mut url = Url::parse("https://github.com/owner/repo/releases/download/v1.0.0/file.tar.gz").unwrap();
+            apply_url_replacements(&mut url);
+            assert_eq!(
+                url.as_str(),
+                "https://artifactory.company.com/artifactory/github-releases/owner/repo/v1.0.0/file.tar.gz"
+            );
+        });
+    }
+
+    #[test]
+    fn test_no_settings_configured() {
+        // Test the real apply_url_replacements function with no settings override
+        // This resets to a clean state where no settings are loaded
+        let _guard = TEST_SETTINGS_LOCK.lock().unwrap();
+        crate::config::Settings::reset(None);
+
         let mut url = Url::parse("https://github.com/owner/repo").unwrap();
+        let original = url.clone();
 
-        // This will use actual settings, but should not crash
+        // This should not crash and should leave URL unchanged
         apply_url_replacements(&mut url);
-
-        // Without specific settings configured, URL should remain unchanged
-        assert_eq!(url.as_str(), "https://github.com/owner/repo");
+        assert_eq!(url.as_str(), original.as_str());
     }
 }
