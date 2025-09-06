@@ -430,32 +430,32 @@ mod tests {
     use indexmap::IndexMap;
     use url::Url;
 
+    // Mutex to ensure tests don't interfere with each other when modifying global settings
+    static TEST_SETTINGS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     // Helper to create test settings with specific URL replacements
     fn with_test_settings<F, R>(replacements: IndexMap<String, String>, test_fn: F) -> R
     where
         F: FnOnce() -> R,
     {
-        // Save current settings state
+        // Lock to prevent parallel tests from interfering with global settings
         let _guard = TEST_SETTINGS_LOCK.lock().unwrap();
         
         // Create settings with custom URL replacements
         let mut settings = crate::config::settings::SettingsPartial::empty();
         settings.url_replacements = Some(replacements);
         
-        // Reset global settings with our test settings
+        // Set settings for this test
         crate::config::Settings::reset(Some(settings));
         
         // Run test
         let result = test_fn();
         
-        // Reset to clean state
+        // Clean up after test
         crate::config::Settings::reset(None);
         
         result
     }
-
-    // Mutex to ensure tests don't interfere with each other
-    static TEST_SETTINGS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn test_simple_string_replacement() {
@@ -605,7 +605,6 @@ mod tests {
     #[test]
     fn test_no_settings_configured() {
         // Test the real apply_url_replacements function with no settings override
-        // This resets to a clean state where no settings are loaded
         let _guard = TEST_SETTINGS_LOCK.lock().unwrap();
         crate::config::Settings::reset(None);
 
