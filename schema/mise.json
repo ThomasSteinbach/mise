@@ -976,6 +976,13 @@
           "description": "List of default shell arguments for unix to be used with inline commands. For example, `sh`, `-c` for sh.",
           "type": "string"
         },
+        "url_replacements": {
+          "description": "Map of URL patterns to replacement URLs for download mirroring and regex-based URL transformations.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "use_file_shell_for_executable_tasks": {
           "default": false,
           "description": "Determines whether to use a specified shell for executing tasks in the tasks directory. When set to true, the shell defined in the file will be used, or the default shell specified by `windows_default_file_shell_args` or `unix_default_file_shell_args` will be applied. If set to false, tasks will be executed directly as programs.",
@@ -1020,13 +1027,6 @@
           "default": "file",
           "description": "Shim file mode for Windows. Options: `file`, `hardlink`, `symlink`.",
           "type": "string"
-        },
-        "url_replacements": {
-          "description": "Map of URL patterns to replacement URLs for download mirroring.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
         },
         "yes": {
           "description": "This will automatically answer yes or no to prompts. This is useful for scripting.",
