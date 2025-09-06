@@ -277,6 +277,8 @@ pub static SETTINGS_META: Lazy<IndexMap<&'static str, SettingsMeta>> = Lazy::new
     for (name, props) in &settings {
         let props = props.as_table().unwrap();
         if let Some(type_) = props.get("type").map(|v| v.as_str().unwrap()) {
+            // We could shadow the 'type_' variable, but its a best practice to avoid shadowing.
+            // Thus, we introduce 'meta_type' here.
             let meta_type = match type_ {
                 "IndexMap<String, String>" => "IndexMap",
                 other => other,
@@ -298,6 +300,8 @@ pub static SETTINGS_META: Lazy<IndexMap<&'static str, SettingsMeta>> = Lazy::new
         for (key, props) in props.as_table().unwrap() {
             let props = props.as_table().unwrap();
             if let Some(type_) = props.get("type").map(|v| v.as_str().unwrap()) {
+                // We could shadow the 'type_' variable, but its a best practice to avoid shadowing.
+                // Thus, we introduce 'meta_type' here.
                 let meta_type = match type_ {
                     "IndexMap<String, String>" => "IndexMap",
                     other => other,
