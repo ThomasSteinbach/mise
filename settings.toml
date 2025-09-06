@@ -1230,12 +1230,14 @@ url_replacements = {
 ### Simple Hostname Replacement
 
 For simple hostname-based mirroring, the key is the original hostname/domain to replace,
-and the value is the replacement hostname/domain. The replacement happens at the hostname level,
-preserving the path and query parameters.
+and the value is the replacement string. The replacement happens by searching and replacing 
+the pattern anywhere in the full URL string (including protocol, hostname, path, and query parameters).
 
 Examples:
-- "github.com" -> "myregistry.net" replaces all GitHub URLs with your mirror  
-- "releases.hashicorp.com" -> "mirror.example.com" replaces HashiCorp releases
+- `github.com` -> `myregistry.net` replaces GitHub hostnames
+- `https://github.com` -> `https://myregistry.net` with protocol excludes e.g. 'api.github.com'
+- `https://github.com` -> `https://proxy.corp.com/github-mirror` replaces GitHub with corporate proxy
+- `http://host.net` -> `https://host.net` replaces protocol from HTTP to HTTPS
 
 ### Advanced Regex Replacement
 
