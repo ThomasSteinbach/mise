@@ -336,11 +336,7 @@ fn github_headers(url: &Url) -> HeaderMap {
 /// Apply URL replacements based on settings configuration
 /// Supports both simple string replacement and regex patterns (prefixed with "regex:")
 pub fn apply_url_replacements(url: &mut Url) {
-    // Try to get settings, return early if not available (e.g., in some test scenarios)
-    let settings = match Settings::try_get() {
-        Ok(settings) => settings,
-        Err(_) => return,
-    };
+    let settings = Settings::get();
     if let Some(replacements) = &settings.url_replacements {
         let url_string = url.to_string();
 
