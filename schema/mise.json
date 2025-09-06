@@ -977,7 +977,7 @@
           "type": "string"
         },
         "url_replacements": {
-          "description": "Map of URL patterns to replacement URLs for download mirroring and regex-based URL transformations.",
+          "description": "Map of URL patterns to replacement URLs for download mirroring and regex-based URL transformations. Example: {\"github.com\": \"github.example.com\", \"regex:^https://example\\.com/(.*)$\": \"https://mirror.com/$1\"}",
           "type": "object",
           "additionalProperties": {
             "type": "string"
